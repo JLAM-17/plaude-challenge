@@ -118,21 +118,22 @@ async function sendSlackApprovalMessage(
 }
 
 /**
- * Request human approval via Slack
- * This function will pause the workflow until a human responds via Slack
+ * Request human approval via Slack (non-blocking version)
+ * This function sends the approval request and returns immediately
+ * The workflow can continue and handle the response asynchronously
  *
  * @param params - The approval request parameters
  * @param approvalId - Pre-generated approval ID (from workflow level)
  * @param webhookUrl - Pre-created webhook URL (from workflow level)
- * @param webhook - The webhook object to await (from workflow level)
+ * @param webhook - The webhook object (not awaited in non-blocking mode)
  */
 export async function requestHumanApproval(
   params: ApprovalRequest,
   approvalId: string,
   webhookUrl: string,
   webhook: any
-): Promise<{ approved: boolean; response: string }> {
-  console.log('=== SLACK APPROVAL START ===');
+): Promise<{ approved: boolean; response: string; pending: boolean }> {
+  console.log('=== SLACK APPROVAL START (NON-BLOCKING) ===');
   console.log('Approval ID:', approvalId);
   console.log('Webhook URL:', webhookUrl);
   console.log('Params:', JSON.stringify(params, null, 2));
@@ -142,16 +143,16 @@ export async function requestHumanApproval(
     // This is a step function so it can make external API calls
     await sendSlackApprovalMessage(params, approvalId, webhookUrl);
 
-    console.log('Waiting for Slack response...');
+    console.log('✅ Slack message sent! Not waiting for response.');
     console.log('When user clicks approve/deny in Slack, response will be sent to:', webhookUrl);
 
-    // Wait for the webhook to be called
-    const request = await webhook;
-    const response = await request.json() as { approved: boolean; response: string };
-    console.log('✅ Received approval response:', response);
-    console.log('=== SLACK APPROVAL END ===');
-
-    return response;
+    // Return immediately without waiting for the webhook
+    // The agent can now continue and inform the user that approval is pending
+    return {
+      approved: false,
+      response: 'pending',
+      pending: true
+    };
   } catch (error) {
     console.error('=== SLACK APPROVAL ERROR ===');
     console.error('Error type:', error?.constructor?.name);
@@ -170,8 +171,10 @@ export async function requestHumanApproval(
 
 // Export the tool definition for the AI agent
 export const slackApprovalTool = {
-  description: `Request approval from a human supervisor via Slack. Use this when you encounter situations that require human judgment, such as:
-The workflow will pause until a human responds with approval or denial.`,
+  description: `Request approval from a human supervisor via Slack. Use this when you encounter situations that require human judgment.
+This tool sends the approval request and returns immediately with a "pending" status. The agent should inform the user that their request has been forwarded to Santa for approval and they will be notified once a decision is made.
+The tool returns: { approved: boolean, response: string, pending: boolean }
+When pending is true, it means the approval request has been sent but not yet decided.`,
   inputSchema: approvalRequestSchema,
   execute: requestHumanApproval,
 };
