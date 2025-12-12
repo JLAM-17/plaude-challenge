@@ -12,12 +12,22 @@ const motivationalPhrases = [
   "Making the impossible possible"
 ];
 
+interface ApprovalResult {
+  approvalId: string;
+  approved: boolean;
+  response: string;
+  situation: string;
+  requestedAction: string;
+  timestamp: number;
+}
+
 export default function Home() {
   const [message, setMessage] = useState("");
   const [conversation, setConversation] = useState<Array<{role: string, content: string}>>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [currentPhrase, setCurrentPhrase] = useState(0);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [processedApprovals, setProcessedApprovals] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -25,6 +35,53 @@ export default function Home() {
     }, 4000);
     return () => clearInterval(interval);
   }, []);
+
+  // Poll for approval results when we have a session
+  useEffect(() => {
+    if (!sessionId) {
+      return;
+    }
+
+    const checkApprovals = async () => {
+      try {
+        const response = await fetch(`/api/check-approvals?sessionId=${sessionId}`);
+        if (!response.ok) return;
+
+        const data = await response.json();
+        if (data.hasResults && data.results) {
+          for (const result of data.results as ApprovalResult[]) {
+            // Skip if we've already processed this approval
+            if (processedApprovals.has(result.approvalId)) {
+              continue;
+            }
+
+            // Mark as processed
+            setProcessedApprovals(prev => new Set(prev).add(result.approvalId));
+
+            // Add Santa's response to the conversation
+            const santaMessage = result.approved
+              ? `🎉 Great news! Santa loved your creative request and has approved it!\n\n✅ ${result.response}\n\nYou'll receive your gift once Juan Luis gets hired by Plaude. Keep believing in the magic! 🎅✨`
+              : `🎨 Santa reviewed your request, but he needs you to be MORE CREATIVE!\n\n❌ ${result.response}\n\nThink outside the box and try again with something more imaginative and unique. Santa believes in your creativity! 💡`;
+
+            setConversation(prev => [...prev, {
+              role: 'assistant',
+              content: santaMessage
+            }]);
+          }
+        }
+      } catch (error) {
+        console.error('Error polling for approvals:', error);
+      }
+    };
+
+    // Check immediately when session starts
+    checkApprovals();
+
+    // Then poll every 5 seconds
+    const pollInterval = setInterval(checkApprovals, 5000);
+
+    return () => clearInterval(pollInterval);
+  }, [sessionId, processedApprovals]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
