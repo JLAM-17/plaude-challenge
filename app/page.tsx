@@ -118,7 +118,7 @@ export default function Home() {
               </h1>
             </div>
             <a
-              href="https://github.com"
+              href="https://github.com/JLAM-17/plaude-challenge"
               target="_blank"
               rel="noopener noreferrer"
               className="px-4 py-2 rounded-full border-2 border-red-500 text-red-700 font-medium hover:bg-red-50 transition-colors font-display"
@@ -192,6 +192,24 @@ export default function Home() {
                   <span><strong>If denied:</strong> Santa needs MORE CREATIVITY! Try again with more imagination! 💡</span>
                 </li>
               </ul>
+
+              {/* Slack Invitation */}
+              <div className="mt-4 p-4 bg-blue-50 border-2 border-blue-300 rounded-xl">
+                <p className="text-sm text-gray-700 mb-2">
+                  <strong className="text-blue-700">🎯 Want to approve requests as Santa?</strong>
+                </p>
+                <p className="text-sm text-gray-600 mb-3">
+                  Join the Slack channel to see and approve gift requests in real-time!
+                </p>
+                <a
+                  href="https://join.slack.com/t/plaudechallenge/shared_invite/zt-3kwsu4m9g-MBVO49OTJWmsyJcY5oTrQA"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors text-sm"
+                >
+                  Join Slack Channel →
+                </a>
+              </div>
             </div>
 
             <div className="flex flex-wrap gap-3">
