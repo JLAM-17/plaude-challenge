@@ -17,7 +17,7 @@ export interface Message {
  * @param sessionId - Current session ID (from workflow context)
  */
 function createApprovalWrapper(sessionId: string) {
-  return async (params: ApprovalRequest): Promise<{ approved: boolean; response: string; pending: boolean }> {
+  return async (params: ApprovalRequest) => {
     console.log('=== WORKFLOW APPROVAL WRAPPER ===');
     console.log('Session ID:', sessionId);
 
@@ -34,7 +34,7 @@ function createApprovalWrapper(sessionId: string) {
  * @param sessionId - Current session ID (from workflow context)
  */
 function createCheckApprovalWrapper(sessionId: string) {
-  return async (): Promise<any> => {
+  return async () => {
     console.log('=== CHECK APPROVAL WRAPPER ===');
     console.log('Session ID:', sessionId);
 

@@ -30,6 +30,7 @@ export interface ApprovalResult {
 
 /**
  * Store an approval result for a session
+ * This is a step function to allow file system access
  */
 export async function storeApprovalResult(
   approvalId: string,
@@ -40,6 +41,8 @@ export async function storeApprovalResult(
     requestDetails: ApprovalRequest;
   }
 ): Promise<void> {
+  'use step';
+
   console.log(`📝 Storing approval result for session ${sessionId}, approval ${approvalId}`);
 
   await ensureStorageDir();
@@ -67,8 +70,11 @@ export async function storeApprovalResult(
 
 /**
  * Get all approval results for a session
+ * This is a step function to allow file system access
  */
 export async function getApprovalResultsForSession(sessionId: string): Promise<ApprovalResult[]> {
+  'use step';
+
   try {
     const sessionDir = path.join(STORAGE_DIR, sessionId);
 
@@ -109,8 +115,11 @@ export async function getApprovalResultsForSession(sessionId: string): Promise<A
 
 /**
  * Get a specific approval result by ID
+ * This is a step function to allow file system access
  */
 export async function getApprovalResult(approvalId: string, sessionId: string): Promise<ApprovalResult | null> {
+  'use step';
+
   try {
     const filePath = path.join(STORAGE_DIR, sessionId, `${approvalId}.json`);
 
@@ -139,8 +148,11 @@ export async function getApprovalResult(approvalId: string, sessionId: string): 
 
 /**
  * Clean up expired results (call this periodically or on startup)
+ * This is a step function to allow file system access
  */
 export async function cleanupExpiredResults(): Promise<void> {
+  'use step';
+
   try {
     await ensureStorageDir();
     const sessions = await fs.readdir(STORAGE_DIR);
