@@ -123,6 +123,7 @@ export async function sendSlackApprovalMessage(
 /**
  * Request human approval via Slack (non-blocking version)
  * Launches a background workflow and returns immediately with pending status
+ * This is a step function to allow calling start()
  *
  * @param params - The approval request parameters
  * @param sessionId - The current session ID
@@ -131,6 +132,8 @@ export async function requestHumanApproval(
   params: ApprovalRequest,
   sessionId: string
 ): Promise<{ approved: boolean; response: string; pending: boolean }> {
+  'use step';
+
   console.log('=== SLACK APPROVAL START (NON-BLOCKING) ===');
   console.log('Session ID:', sessionId);
   console.log('Params:', JSON.stringify(params, null, 2));
