@@ -1,7 +1,8 @@
 import { DurableAgent } from '@workflow/ai/agent';
-import { getWritable, createWebhook } from 'workflow';
+import { getWritable } from 'workflow';
 import { agentInstructions } from './agent-instructions';
 import { slackApprovalTool, type ApprovalRequest } from './slack-approval-tool';
+import { checkApprovalTool } from './check-approval-tool';
 import type { UIMessageChunk } from 'ai';
 
 export interface Message {
@@ -11,37 +12,53 @@ export interface Message {
 
 /**
  * Workflow-level wrapper for Slack approval
- * This ensures createWebhook() is called at workflow level, not step level
+ * Launches background workflow and returns immediately
+ *
+ * @param sessionId - Current session ID (from workflow context)
  */
-async function workflowApprovalWrapper(params: ApprovalRequest): Promise<{ approved: boolean; response: string }> {
-  // We're already inside 'use workflow' context from agentWorkflow
-  // So we can call createWebhook() here
+function createApprovalWrapper(sessionId: string) {
+  return async (params: ApprovalRequest): Promise<{ approved: boolean; response: string; pending: boolean }> {
+    console.log('=== WORKFLOW APPROVAL WRAPPER ===');
+    console.log('Session ID:', sessionId);
 
-  const approvalId = `approval_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    // Call the approval tool with session ID
+    const result = await slackApprovalTool.execute(params, sessionId);
 
-  console.log('=== WORKFLOW APPROVAL WRAPPER ===');
-  console.log('Creating webhook at workflow level...');
+    return result;
+  };
+}
 
-  // Create webhook at workflow level
-  const webhook = createWebhook({ token: approvalId });
-  console.log('Webhook created:', webhook.url);
+/**
+ * Workflow-level wrapper for checking approval status
+ *
+ * @param sessionId - Current session ID (from workflow context)
+ */
+function createCheckApprovalWrapper(sessionId: string) {
+  return async (): Promise<any> => {
+    console.log('=== CHECK APPROVAL WRAPPER ===');
+    console.log('Session ID:', sessionId);
 
-  // Now call the original tool function with the webhook
-  const result = await slackApprovalTool.execute(params, approvalId, webhook.url, webhook);
+    // Call the check approval tool with session ID
+    const result = await checkApprovalTool.execute(sessionId);
 
-  return result;
+    return result;
+  };
 }
 
 /**
  * Main agent workflow that handles customer service requests
  * with human-in-the-loop approval via Slack
  *
+ * @param messages - Conversation messages
+ * @param sessionId - Session ID for tracking approvals
+ *
  * Note: This is a workflow function that must be called via start() from workflow/api
  */
-export async function agentWorkflow(messages: Message[]) {
+export async function agentWorkflow(messages: Message[], sessionId: string) {
   'use workflow';
 
   console.log('agentWorkflow called with messages:', messages);
+  console.log('Session ID:', sessionId);
 
   // Initialize the DurableAgent with Anthropic's Claude model via AI Gateway
   console.log('Initializing DurableAgent...');
@@ -52,8 +69,14 @@ export async function agentWorkflow(messages: Message[]) {
       request_human_approval: {
         description: slackApprovalTool.description,
         inputSchema: slackApprovalTool.inputSchema,
-        // Use the workflow-level wrapper instead of direct execute
-        execute: workflowApprovalWrapper,
+        // Use session-aware wrapper
+        execute: createApprovalWrapper(sessionId),
+      },
+      check_approval_status: {
+        description: checkApprovalTool.description,
+        inputSchema: checkApprovalTool.inputSchema,
+        // Use session-aware wrapper
+        execute: createCheckApprovalWrapper(sessionId),
       },
     },
   });
@@ -85,7 +108,7 @@ export async function agentWorkflow(messages: Message[]) {
  * Use this for real-time responses in the UI
  * Note: Don't pass WritableStream as parameter - it's not serializable
  */
-export async function agentWorkflowStream(messages: Message[]) {
+export async function agentWorkflowStream(messages: Message[], sessionId: string) {
   'use workflow';
 
   const agent = new DurableAgent({
@@ -95,8 +118,14 @@ export async function agentWorkflowStream(messages: Message[]) {
       request_human_approval: {
         description: slackApprovalTool.description,
         inputSchema: slackApprovalTool.inputSchema,
-        // Use the workflow-level wrapper instead of direct execute
-        execute: workflowApprovalWrapper,
+        // Use session-aware wrapper
+        execute: createApprovalWrapper(sessionId),
+      },
+      check_approval_status: {
+        description: checkApprovalTool.description,
+        inputSchema: checkApprovalTool.inputSchema,
+        // Use session-aware wrapper
+        execute: createCheckApprovalWrapper(sessionId),
       },
     },
   });

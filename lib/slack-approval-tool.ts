@@ -1,5 +1,7 @@
 import { WebClient } from '@slack/web-api';
 import { z } from 'zod';
+import { start } from 'workflow/api';
+import { backgroundApprovalWorkflow } from './background-approval-workflow';
 
 // Schema for the approval request
 export const approvalRequestSchema = z.object({
@@ -13,8 +15,9 @@ export type ApprovalRequest = z.infer<typeof approvalRequestSchema>;
 
 /**
  * Send approval message to Slack (step function)
+ * Exported for use by background-approval-workflow
  */
-async function sendSlackApprovalMessage(
+export async function sendSlackApprovalMessage(
   params: ApprovalRequest,
   approvalId: string,
   webhookUrl: string
@@ -119,39 +122,38 @@ async function sendSlackApprovalMessage(
 
 /**
  * Request human approval via Slack (non-blocking version)
- * This function sends the approval request and returns immediately
- * The workflow can continue and handle the response asynchronously
+ * Launches a background workflow and returns immediately with pending status
  *
  * @param params - The approval request parameters
- * @param approvalId - Pre-generated approval ID (from workflow level)
- * @param webhookUrl - Pre-created webhook URL (from workflow level)
- * @param webhook - The webhook object (not awaited in non-blocking mode)
+ * @param sessionId - The current session ID
  */
 export async function requestHumanApproval(
   params: ApprovalRequest,
-  approvalId: string,
-  webhookUrl: string,
-  webhook: any
+  sessionId: string
 ): Promise<{ approved: boolean; response: string; pending: boolean }> {
   console.log('=== SLACK APPROVAL START (NON-BLOCKING) ===');
-  console.log('Approval ID:', approvalId);
-  console.log('Webhook URL:', webhookUrl);
+  console.log('Session ID:', sessionId);
   console.log('Params:', JSON.stringify(params, null, 2));
 
   try {
-    // Send the Slack message with the webhook URL embedded in buttons
-    // This is a step function so it can make external API calls
-    await sendSlackApprovalMessage(params, approvalId, webhookUrl);
+    // Generate unique approval ID
+    const approvalId = `approval_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    console.log('Approval ID:', approvalId);
 
-    console.log('✅ Slack message sent! Not waiting for response.');
-    console.log('When user clicks approve/deny in Slack, response will be sent to:', webhookUrl);
+    // Launch background workflow to handle the approval
+    // This workflow will stay alive waiting for Slack response
+    console.log('🚀 Launching background approval workflow...');
+    const run = await start(backgroundApprovalWorkflow, [approvalId, sessionId, params]);
+    console.log('✅ Background workflow started:', run.runId);
 
-    // Return immediately without waiting for the webhook
-    // The agent can now continue and inform the user that approval is pending
+    // Return immediately - the user doesn't have to wait
+    console.log('Returning immediately with pending status');
+    console.log('=== SLACK APPROVAL END (NON-BLOCKING) ===');
+
     return {
       approved: false,
       response: 'pending',
-      pending: true
+      pending: true,
     };
   } catch (error) {
     console.error('=== SLACK APPROVAL ERROR ===');
@@ -171,10 +173,12 @@ export async function requestHumanApproval(
 
 // Export the tool definition for the AI agent
 export const slackApprovalTool = {
-  description: `Request approval from a human supervisor via Slack. Use this when you encounter situations that require human judgment.
-This tool sends the approval request and returns immediately with a "pending" status. The agent should inform the user that their request has been forwarded to Santa for approval and they will be notified once a decision is made.
+  description: `Request approval from Santa via Slack for a gift request. Use this when the user makes a gift request.
+This tool sends the approval request to Santa and returns immediately with a "pending" status.
+IMPORTANT: After calling this tool, tell the user: "Great! I've forwarded your request to Santa for approval! He'll review your creative idea and get back to you soon. Keep an eye out for his decision!"
 The tool returns: { approved: boolean, response: string, pending: boolean }
-When pending is true, it means the approval request has been sent but not yet decided.`,
+When pending is true, it means the approval request has been sent to Santa but not yet decided.
+Users can later ask "Did Santa respond?" and you should use the check_approval_status tool to check.`,
   inputSchema: approvalRequestSchema,
   execute: requestHumanApproval,
 };

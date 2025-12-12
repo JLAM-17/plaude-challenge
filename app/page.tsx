@@ -17,6 +17,7 @@ export default function Home() {
   const [conversation, setConversation] = useState<Array<{role: string, content: string}>>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [currentPhrase, setCurrentPhrase] = useState(0);
+  const [sessionId, setSessionId] = useState<string | null>(null);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -35,7 +36,7 @@ export default function Home() {
     setIsLoading(true);
 
     try {
-      // Call the agent API with the full conversation history
+      // Call the agent API with the full conversation history and session ID
       const response = await fetch('/api/agent', {
         method: 'POST',
         headers: {
@@ -43,6 +44,7 @@ export default function Home() {
         },
         body: JSON.stringify({
           messages: [...conversation, { role: 'user', content: userMessage }],
+          sessionId: sessionId || undefined, // Include session ID if available
         }),
       });
 
@@ -52,6 +54,12 @@ export default function Home() {
 
       const data = await response.json();
       console.log('API response:', data);
+
+      // Store session ID from response
+      if (data.sessionId && !sessionId) {
+        setSessionId(data.sessionId);
+        console.log('Stored new session ID:', data.sessionId);
+      }
 
       // Extract the assistant's response from the result
       // The result contains the full response from DurableAgent.generate()
